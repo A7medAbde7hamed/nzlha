@@ -17,7 +17,8 @@ export async function updateSession(request: NextRequest) {
       },
     },
   });
-  const { data: { claims } } = await supabase.auth.getClaims();
+  const { data } = await supabase.auth.getClaims();
+  const claims = data?.claims;
   const authRoute = request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname.startsWith('/auth');
   if (!claims && !authRoute) {
     const destination = request.nextUrl.clone();
