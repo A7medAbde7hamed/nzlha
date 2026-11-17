@@ -1,45 +1,33 @@
-# nzlha — Creator Studio (Phase 1)
+# nzlha — Creator Studio
 
-Dark, bilingual (English / Arabic) creator workspace scaffold for scheduling content across YouTube, Instagram, TikTok and Facebook.
+Private, bilingual (Arabic / English) creator workspace for organizing videos and recording intended platforms. The interface supports YouTube, Instagram, TikTok and Facebook. It does not claim to connect accounts, schedule, publish, or report analytics.
 
-## Included in Phase 1
+## What works
 
-- Responsive dashboard shell, sidebar navigation, workspace overview and KPI cards.
-- English / Arabic UI toggle with RTL layout.
-- Content library, calendar, connected-account placeholder and settings views.
-- Create-post modal with local draft state (no real video upload or publishing yet).
-- Supabase browser/server clients using `@supabase/ssr` and a Next.js request proxy for cookie refresh.
-- Email/password and magic-link login screen plus auth callback.
-- Initial `profiles` migration with row-level security policies.
+- Supabase email/password sign-in, sign-up, and email magic links.
+- Private per-user video library with row-level security.
+- Optional private video upload to Supabase Storage (MP4, MOV, WebM; up to 50 MB).
+- Per-video selection of intended platforms, responsive Arabic RTL and English UI, searchable library, and deletion.
+- Explicit loading, empty, and error states.
 
-## Requirements
+## Not implemented
 
-- Node.js 22 or newer
-- A Supabase project dedicated to `nzlha` (do not reuse an unrelated project)
+Official OAuth connections, platform API permissions, scheduled publishing, background jobs, retries, platform-specific validation, and analytics. Platform selection records intent only. A `draft` is a saved library item, not a scheduled post.
 
-## Run locally
+## Local development
 
-```bash
-npm install
-cp .env.example .env.local
-# Fill NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-npm run dev
-```
+- Node.js 22.x
+- Copy `.env.example` to `.env.local` and set the Supabase project URL and publishable key.
+- Apply the migrations in `supabase/migrations` in order.
+- In Supabase Auth, set the Site URL to the app origin and allow `/auth/callback` for local and production origins.
+- Run `npm install`, `npm run dev`, then open http://localhost:3000.
 
-Open http://localhost:3000.
+The dashboard requires an authenticated user and the database migration. There is no sample-data mode.
 
-If Supabase environment variables are not present, the dashboard remains available as a UI preview. Authentication is not active until a Supabase project is configured.
+## Security
 
-## Supabase setup
+The browser uses only the Supabase publishable key. Never put a service-role/secret key in a `NEXT_PUBLIC_` variable or client code. `video_posts` has per-user RLS. Video files live in a private Storage bucket and the first path segment must match the authenticated user ID. Uploads are size- and MIME-limited by both the client and bucket configuration.
 
-1. Create or select a dedicated Supabase project for nzlha.
-2. Copy its Project URL and **publishable key** into `.env.local`.
-3. Apply `supabase/migrations/202611160001_profiles.sql`.
-4. Configure the Auth site URL and redirect URL: `http://localhost:3000/auth/callback` for local development and the production callback URL after deployment.
-5. Enable the desired email sign-in methods.
+## Deployment
 
-Never place a Supabase secret/service-role key in a `NEXT_PUBLIC_` variable or browser code.
-
-## Current boundaries
-
-The dashboard currently uses sample data. Video upload, persistent posts, platform OAuth, per-platform scheduling, background jobs and real analytics are deliberately not represented as working integrations yet. Those belong to later phases and require the appropriate official platform API approvals.
+Configure `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` for Production, Preview, and Development in Vercel. Confirm Supabase Auth redirect URLs include the deployment origin. Check the Vercel project access protection before presenting the site as public. Publishing integrations should be added only after the official platform OAuth, permissions, background execution, retries, and platform-specific rules are built and verified.

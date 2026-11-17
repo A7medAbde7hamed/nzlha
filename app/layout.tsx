@@ -3,7 +3,9 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: 'nzlha — Creator Studio',
-  description: 'مساحة واحدة لإدارة وجدولة محتواك على منصات التواصل.',
+  description: 'A private, bilingual workspace to organize your videos and platform plans.',
+  applicationName: 'nzlha',
+  robots: { index: true, follow: true },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
