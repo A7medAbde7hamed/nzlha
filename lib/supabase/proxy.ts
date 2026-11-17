@@ -3,6 +3,10 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
+  const pathname = request.nextUrl.pathname;
+  const needsSession = pathname.startsWith('/dashboard') || pathname.startsWith('/login') || pathname.startsWith('/auth');
+  if (!needsSession) return response;
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
   if (!url || !key) return response;
@@ -19,14 +23,14 @@ export async function updateSession(request: NextRequest) {
   });
   const { data } = await supabase.auth.getClaims();
   const claims = data?.claims;
-  const protectedRoute = request.nextUrl.pathname.startsWith('/dashboard');
+  const protectedRoute = pathname.startsWith('/dashboard');
   if (!claims && protectedRoute) {
     const destination = request.nextUrl.clone();
     destination.pathname = '/login';
     destination.searchParams.set('next', request.nextUrl.pathname);
     return NextResponse.redirect(destination);
   }
-  if (claims && request.nextUrl.pathname === '/login') {
+  if (claims && pathname === '/login') {
     const destination = request.nextUrl.clone();
     destination.pathname = '/dashboard';
     destination.search = '';
@@ -34,3 +38,4 @@ export async function updateSession(request: NextRequest) {
   }
   return response;
 }
+
