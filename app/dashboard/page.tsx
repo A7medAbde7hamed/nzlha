@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Activity, CalendarDays, Check, ChevronDown, Clapperboard, CloudUpload, FileVideo2, Film, Globe2, LayoutDashboard, Link2, LoaderCircle, LogOut, Menu, Plus, Search, Settings2, ShieldCheck, Trash2, Video, X, Youtube, Instagram, Facebook } from 'lucide-react';
+import { Activity, CalendarDays, Check, ChevronDown, Clapperboard, CloudUpload, FileVideo2, Film, Globe2, LayoutDashboard, Link2, LoaderCircle, LogOut, Menu, Plus, Search, Settings2, ShieldCheck, Trash2, Video, X, Youtube, Instagram, Facebook, Unlink } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
 type Platform = 'youtube' | 'instagram' | 'tiktok' | 'facebook';
 type Post = { id: string; title: string; description: string; platforms: Platform[]; status: 'draft' | 'ready'; scheduled_at: string | null; storage_path: string | null; original_filename: string | null; created_at: string };
+type ConnectedAccount = { id: string; platform: 'youtube'; provider_account_id: string; display_name: string; avatar_url: string | null; scopes: string[]; connected_at: string };
 const platformList: { id: Platform; name: string; Icon: typeof Youtube }[] = [
   { id: 'youtube', name: 'YouTube', Icon: Youtube }, { id: 'instagram', name: 'Instagram', Icon: Instagram },
   { id: 'tiktok', name: 'TikTok', Icon: Video }, { id: 'facebook', name: 'Facebook', Icon: Facebook },
@@ -16,6 +17,28 @@ const copy = {
   ar: { overview: 'نظرة عامة', content: 'مكتبة الفيديوهات', calendar: 'التقويم', accounts: 'المنصات', settings: 'الإعدادات', workspace: 'مساحة العمل', drafts: 'فيديوهات محفوظة', selected: 'المنصات المحددة', create: 'أضف فيديو', subtitle: 'مساحة هادئة للفيديوهات التي تخطط لنشرها.', search: 'ابحث في فيديوهاتك', total: 'فيديوهات في مكتبتك', ready: 'جاهزة عند ربط المنصات', connected: 'حسابات متصلة', unavailable: 'لا توجد حسابات متصلة', upcoming: 'فيديوهاتك', all: 'كل الفيديوهات', emptyTitle: 'ابدأ مكتبتك من هنا', emptyBody: 'احفظ فيديو مع عنوانه والمنصات التي تنوي النشر عليها. لن يُنشر أي شيء قبل ربط المنصات الرسمية ومنحها الصلاحيات اللازمة.', emptyAction: 'أضف أول فيديو', noResults: 'لا توجد فيديوهات تطابق البحث.', createTitle: 'أضف إلى مكتبتك', title: 'عنوان الفيديو', titleHint: 'عنوان قصير وواضح', description: 'ملاحظات (اختياري)', platforms: 'المنصات المقصودة', choose: 'اختر منصة واحدة أو أكثر', video: 'ملف الفيديو (اختياري)', drop: 'اختر فيديو من جهازك', fileHint: 'MP4 أو MOV أو WebM · حتى ٥٠ ميجابايت · تخزين خاص', save: 'احفظ الفيديو', saving: 'جارٍ الحفظ…', loading: 'جارٍ تحميل مكتبتك…', retry: 'حاول مرة أخرى', draft: 'محفوظ', cancel: 'إلغاء', saved: 'تم حفظ الفيديو في مكتبتك الخاصة.', removed: 'تم حذف الفيديو.', error: 'حدث خطأ. حاول مرة أخرى.', noPlatforms: 'اختر منصة واحدة على الأقل.', tooLarge: 'اختر فيديو أصغر من ٥٠ ميجابايت.', badFile: 'اختر فيديو بصيغة MP4 أو MOV أو WebM.', signOut: 'تسجيل الخروج', language: 'English', today: 'مساحة عملك', secure: 'خاصة بحسابك', integrationTitle: 'ربط المنصات', integrationBody: 'لا توجد حسابات متصلة. يتطلب النشر صلاحيات OAuth رسمية ومراجعة من كل منصة.', integrationStatus: 'غير متصل', noPublishing: 'النشر والجدولة غير متاحين حالياً', noPublishingBody: 'تحفظ مساحة العمل بيانات الفيديو والملفات الخاصة. يتطلب النشر التلقائي واجهات رسمية وتفويض الحسابات ومهام خلفية موثوقة.', latest: 'أضيفت مؤخراً', delete: 'حذف', deleting: 'جارٍ الحذف…', videoOptional: 'يمكنك إضافة ملف الفيديو الآن أو حفظ التفاصيل أولاً.', calendarEmpty: 'ستظهر الجدولة هنا بعد تنفيذ تكاملات النشر.', month: 'فيديوهاتك المحفوظة', account: 'الحساب', languageLabel: 'اللغة', privateStorage: 'تخزين فيديوهات خاص', privateStorageBody: 'الملفات المرفوعة خاصة ولا يمكن الوصول إليها إلا من حسابك.', allPlatforms: 'اختيار المنصات يسجل فقط وجهات النشر التي تنوي استخدامها.' },
 };
 const allowedTypes = ['video/mp4', 'video/quicktime', 'video/webm'];
+const connectionCopy = {
+  en: {
+    youtubeInfo: 'Connect a Google account to confirm and read your YouTube channel. This does not publish or schedule videos.',
+    connect: 'Connect YouTube', setup: 'Google setup required', connected: 'Connected', connectedSince: 'Connected', disconnect: 'Disconnect', disconnecting: 'Disconnecting…',
+    loading: 'Checking connection…', loadError: 'Could not load platform connections.', unavailable: 'Connection is not configured yet.',
+    comingSoon: 'Not available yet', otherInfo: 'This platform is not connected. Official account authorization is not available yet.',
+    connectedNotice: 'YouTube channel connected. Publishing is still unavailable.', disconnectedNotice: 'YouTube disconnected.', revokeWarning: 'YouTube disconnected here, but Google access could not be revoked. Remove nzlha from your Google Account permissions.',
+    disconnectError: 'Could not disconnect this channel. Please try again.', setupRequired: 'Google connection setup is incomplete. The studio owner needs to configure the official Google app first.',
+    denied: 'Google authorization was cancelled.', failed: 'We could not connect YouTube. Please try again.', noChannel: 'This Google account does not have an accessible YouTube channel.',
+    multipleChannels: 'This Google account returned more than one channel. Channel selection is not available yet; connect an account with a single channel.', authRequired: 'Your session expired. Sign in again, then reconnect YouTube.',
+  },
+  ar: {
+    youtubeInfo: 'اربط حساب Google لقراءة قناتك على YouTube والتحقق منها. الربط لا ينشر الفيديوهات ولا يجدولها.',
+    connect: 'اربط YouTube', setup: 'إعداد Google مطلوب', connected: 'متصل', connectedSince: 'تاريخ الربط', disconnect: 'إلغاء الربط', disconnecting: 'جارٍ إلغاء الربط…',
+    loading: 'جارٍ التحقق من الربط…', loadError: 'تعذر تحميل حالة ربط المنصات.', unavailable: 'الربط غير مهيأ بعد.',
+    comingSoon: 'غير متاح حالياً', otherInfo: 'هذه المنصة غير متصلة. ربط الحساب الرسمي غير متاح حتى الآن.',
+    connectedNotice: 'تم ربط قناة YouTube. النشر ما زال غير متاح.', disconnectedNotice: 'تم إلغاء ربط YouTube.', revokeWarning: 'أُلغي الربط من هنا، لكن تعذر إلغاء صلاحية Google. أزل nzlha من صلاحيات حساب Google.',
+    disconnectError: 'تعذر إلغاء ربط القناة. حاول مرة أخرى.', setupRequired: 'إعداد ربط Google غير مكتمل. يحتاج مالك المنصة إلى إعداد تطبيق Google الرسمي أولاً.',
+    denied: 'تم إلغاء تفويض Google.', failed: 'تعذر ربط YouTube. حاول مرة أخرى.', noChannel: 'حساب Google ده مش عليه قناة YouTube متاحة.',
+    multipleChannels: 'حساب Google رجّع أكتر من قناة. اختيار القناة غير متاح حالياً؛ اربط حساباً عليه قناة واحدة.', authRequired: 'انتهت الجلسة. سجّل الدخول ثم أعد ربط YouTube.',
+  },
+} as const;
 
 export default function Dashboard() {
   const router = useRouter();
@@ -34,7 +57,13 @@ export default function Dashboard() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [connectedAccounts, setConnectedAccounts] = useState<ConnectedAccount[]>([]);
+  const [accountsLoading, setAccountsLoading] = useState(true);
+  const [accountsError, setAccountsError] = useState(false);
+  const [youtubeConfigured, setYoutubeConfigured] = useState(false);
+  const [disconnecting, setDisconnecting] = useState<string | null>(null);
   const t = copy[locale];
+  const c = connectionCopy[locale];
   const ar = locale === 'ar';
   const nav = useMemo(() => [
     { id: 'overview', label: t.overview, Icon: LayoutDashboard }, { id: 'content', label: t.content, Icon: Film },
@@ -50,6 +79,45 @@ export default function Dashboard() {
     } catch { setLoadError(true); } finally { setLoading(false); }
   }, []);
   useEffect(() => { void Promise.resolve().then(loadPosts); }, [loadPosts]);
+  const loadConnections = useCallback(async () => {
+    setAccountsLoading(true); setAccountsError(false);
+    try {
+      const response = await fetch('/api/integrations/youtube/status', { cache: 'no-store' });
+      if (!response.ok) throw new Error('Connection status unavailable');
+      const result = await response.json() as { configured: boolean; accounts: ConnectedAccount[] };
+      setYoutubeConfigured(result.configured === true);
+      setConnectedAccounts(Array.isArray(result.accounts) ? result.accounts : []);
+    } catch {
+      setAccountsError(true);
+    } finally {
+      setAccountsLoading(false);
+    }
+  }, []);
+  useEffect(() => { void Promise.resolve().then(loadConnections); }, [loadConnections]);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const connection = params.get('connection');
+    if (!connection) return;
+    const openAccounts = params.get('section') === 'accounts';
+    const messages: Record<string, string> = {
+      connected: c.connectedNotice,
+      denied: c.denied,
+      failed: c.failed,
+      setup_required: c.setupRequired,
+      no_channel: c.noChannel,
+      multiple_channels: c.multipleChannels,
+      auth_required: c.authRequired,
+    };
+    window.setTimeout(() => {
+      if (openAccounts) setActive('accounts');
+      setNotice(messages[connection] ?? c.failed);
+    }, 0);
+    params.delete('connection');
+    params.delete('section');
+    const queryString = params.toString();
+    window.history.replaceState(null, '', `${window.location.pathname}${queryString ? `?${queryString}` : ''}`);
+    if (connection === 'connected') window.setTimeout(() => { void loadConnections(); }, 0);
+  }, [c, loadConnections]);
   const filtered = useMemo(() => posts.filter(post => `${post.title} ${post.description ?? ''}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())), [posts, query]);
 
   async function savePost(event: React.FormEvent<HTMLFormElement>) {
@@ -85,6 +153,25 @@ export default function Dashboard() {
       setPosts(current => current.filter(item => item.id !== post.id)); setNotice(t.removed);
     } catch { setNotice(t.error); await loadPosts(); } finally { setDeleting(null); }
   }
+  async function disconnectAccount(account: ConnectedAccount) {
+    setDisconnecting(account.id); setNotice('');
+    try {
+      const response = await fetch('/api/integrations/youtube/disconnect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accountId: account.id }),
+        cache: 'no-store',
+      });
+      const result = await response.json() as { providerRevoked?: boolean };
+      if (!response.ok) throw new Error('Disconnect failed');
+      setNotice(result.providerRevoked ? c.disconnectedNotice : c.revokeWarning);
+      await loadConnections();
+    } catch {
+      setNotice(c.disconnectError);
+    } finally {
+      setDisconnecting(null);
+    }
+  }
   async function signOut() { await createClient().auth.signOut(); router.replace('/login'); }
   const formattedDate = (value: string) => new Intl.DateTimeFormat(ar ? 'ar' : 'en', { dateStyle: 'medium' }).format(new Date(value));
 
@@ -102,13 +189,35 @@ export default function Dashboard() {
       <div className="page-content">
         <div className="page-heading"><div><p className="overline">NZLHA STUDIO <span>·</span> {t.secure}</p><h1>{active === 'overview' ? t.overview : nav.find(item => item.id === active)?.label}</h1><p className="page-subtitle">{t.subtitle}</p></div>{active !== 'accounts' && active !== 'settings' && <button className="primary-button" onClick={() => { setNotice(''); setComposer(true); }}><Plus size={18}/>{t.create}</button>}</div>
         {notice && <div className="notice" role="status">{notice}<button className="icon-button" onClick={() => setNotice('')} aria-label="Dismiss"><X size={15}/></button></div>}
-        {active === 'overview' && <><section className="overview-grid"><article className="metric-card"><span className="metric-icon"><Film size={18}/></span><p>{t.total}</p><strong>{loading ? '—' : posts.length}</strong><small>{t.latest}</small></article><article className="metric-card muted-metric"><span className="metric-icon"><CalendarDays size={18}/></span><p>{t.ready}</p><strong>—</strong><small>{t.noPublishing}</small></article><article className="metric-card muted-metric"><span className="metric-icon"><Link2 size={18}/></span><p>{t.connected}</p><strong>0</strong><small>{t.unavailable}</small></article></section>
+        {active === 'overview' && <><section className="overview-grid"><article className="metric-card"><span className="metric-icon"><Film size={18}/></span><p>{t.total}</p><strong>{loading ? '—' : posts.length}</strong><small>{t.latest}</small></article><article className="metric-card muted-metric"><span className="metric-icon"><CalendarDays size={18}/></span><p>{t.ready}</p><strong>—</strong><small>{t.noPublishing}</small></article><article className="metric-card muted-metric"><span className="metric-icon"><Link2 size={18}/></span><p>{t.connected}</p><strong>{accountsLoading ? '—' : connectedAccounts.length}</strong><small>{accountsError ? c.loadError : connectedAccounts.length ? c.connected : t.unavailable}</small></article></section>
           <div className="content-grid"><section className="surface library-surface"><div className="section-heading"><div><h2>{t.upcoming}</h2><p>{t.all}</p></div><button className="text-button" onClick={() => setActive('content')}>{t.content} <span>←</span></button></div><PostList posts={filtered.slice(0, 5)} loading={loading} error={loadError} noResults={Boolean(query.trim() && posts.length)} onRetry={loadPosts} onDelete={removePost} deleting={deleting} t={t} formatDate={formattedDate}/></section>
             <section className="surface integration-surface"><span className="feature-icon"><Link2 size={19}/></span><p className="overline">{t.integrationTitle}</p><h2>{t.noPublishing}</h2><p>{t.noPublishingBody}</p><button className="outlined-button" onClick={() => setActive('accounts')}>{t.accounts}<span>←</span></button></section></div>
         </>}
         {active === 'content' && <section className="surface full-surface"><div className="section-heading"><div><h2>{t.all}</h2><p>{posts.length} · {t.drafts}</p></div><FileVideo2 size={19} className="heading-icon"/></div><PostList posts={filtered} loading={loading} error={loadError} noResults={Boolean(query.trim() && posts.length)} onRetry={loadPosts} onDelete={removePost} deleting={deleting} t={t} formatDate={formattedDate}/></section>}
         {active === 'calendar' && <section className="surface full-surface"><div className="section-heading"><div><h2>{t.month}</h2><p>{t.calendar}</p></div><CalendarDays size={19} className="heading-icon"/></div><div className="callout"><Activity size={18}/><p>{t.calendarEmpty}</p></div><PostList posts={filtered} loading={loading} error={loadError} noResults={Boolean(query.trim() && posts.length)} onRetry={loadPosts} onDelete={removePost} deleting={deleting} t={t} formatDate={formattedDate}/></section>}
-        {active === 'accounts' && <section className="platform-grid">{platformList.map(({ id, name, Icon }) => <article className="platform-card" key={id}><span className="platform-icon"><Icon size={21}/></span><div><h2>{name}</h2><p>{t.integrationStatus}</p></div><span className="status-pill">{t.integrationStatus}</span><p className="platform-info">{t.integrationBody}</p></article>)}</section>}
+        {active === 'accounts' && <section className="platform-grid" aria-label={t.accounts}>{platformList.map(({ id, name, Icon }) => {
+          const isYouTube = id === 'youtube';
+          const status = !isYouTube ? c.comingSoon : accountsLoading ? c.loading : accountsError ? c.loadError : connectedAccounts.length ? c.connected : youtubeConfigured ? t.integrationStatus : c.setup;
+          return <article className={`platform-card ${isYouTube && connectedAccounts.length ? 'platform-card-connected' : ''}`} key={id}>
+            <span className="platform-icon"><Icon size={21}/></span>
+            <div className="platform-heading"><h2>{name}</h2><p>{status}</p></div>
+            <span className={`status-pill ${isYouTube && connectedAccounts.length ? 'connected-pill' : ''}`}>{status}</span>
+            <p className="platform-info">{isYouTube ? c.youtubeInfo : c.otherInfo}</p>
+            {isYouTube ? <div className="youtube-controls">
+              {accountsLoading && <div className="account-loading"><LoaderCircle size={16} className="spin"/><span>{c.loading}</span></div>}
+              {accountsError && <div className="account-error" role="alert"><span>{c.loadError}</span><button className="text-button" onClick={loadConnections}>{t.retry}</button></div>}
+              {connectedAccounts.map(account => <div className="connected-account" key={account.id}>
+                <span className="connected-account-icon"><Youtube size={17}/></span>
+                <span className="connected-account-copy"><b>{account.display_name}</b><small>{c.connectedSince} · {formattedDate(account.connected_at)}</small></span>
+                <button className="outlined-button disconnect-button" disabled={disconnecting === account.id} onClick={() => void disconnectAccount(account)} aria-label={`${c.disconnect}: ${account.display_name}`}>
+                  {disconnecting === account.id ? <LoaderCircle size={15} className="spin"/> : <Unlink size={15}/>}<span>{disconnecting === account.id ? c.disconnecting : c.disconnect}</span>
+                </button>
+              </div>)}
+              {youtubeConfigured ? <a className="outlined-button connect-button" href="/api/integrations/youtube/connect"><Link2 size={16}/>{c.connect}</a> : <button className="outlined-button connect-button" disabled title={c.setupRequired}><ShieldCheck size={16}/>{c.setup}</button>}
+              {!youtubeConfigured && !accountsLoading && <p className="setup-note">{c.unavailable}</p>}
+            </div> : <div className="platform-coming-soon"><span>{c.comingSoon}</span></div>}
+          </article>;
+        })}</section>}
         {active === 'settings' && <section className="surface settings-surface"><div className="section-heading"><div><h2>{t.account}</h2><p>{t.privateStorage}</p></div><ShieldCheck size={19} className="heading-icon"/></div><div className="setting-row"><span><b>{t.languageLabel}</b><small>{ar ? 'العربية' : 'English'}</small></span><button className="outlined-button" onClick={() => setLocale(ar ? 'en' : 'ar')}>{t.language}</button></div><div className="setting-row"><span><b>{t.privateStorage}</b><small>{t.privateStorageBody}</small></span><ShieldCheck size={18}/></div></section>}
         <footer className="page-footer"><ShieldCheck size={15}/><span>{t.allPlatforms}</span><i>·</i><span>{t.privateStorage}</span></footer>
       </div>
